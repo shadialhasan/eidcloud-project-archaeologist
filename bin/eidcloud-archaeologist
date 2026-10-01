@@ -1,0 +1,219 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+// Look for composer autoloader first, otherwise fallback to native autoloader
+$composerAutoload = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($composerAutoload)) {
+    require_once $composerAutoload;
+} else {
+    require_once __DIR__ . '/../src/Core/Autoloader.php';
+    \EidCloud\ProjectArchaeologist\Core\Autoloader::register();
+}
+
+use EidCloud\ProjectArchaeologist\Archaeologist;
+
+function printBanner(): void
+{
+    echo "\n";
+    echo "  🏛️  ===============================================================\n";
+    echo "  🏛️   EIDCLOUD PROJECT ARCHAEOLOGIST - Legacy Codebase Excavator     \n";
+    echo "  🏛️   Reverse-Engineering & Dead Code Detection Engine (Pure PHP 8+) \n";
+    echo "  🏛️  ===============================================================\n\n";
+}
+
+function printHelp(): void
+{
+    printBanner();
+    echo "Usage:\n";
+    echo "  php bin/eidcloud-archaeologist [command] [target_path] [options]\n\n";
+    echo "Available Commands:\n";
+    echo "  excavate <dir>            Perform deep excavation and synthesize documentation\n";
+    echo "                            Options: --out=<dir> (default: ./docs/)\n";
+    echo "                                     --json      (output result as JSON)\n";
+    echo "  dead-code <dir>           Detect abandoned classes, methods, and functions\n";
+    echo "                            Options: --json      (output JSON format)\n";
+    echo "  architecture-map <dir>    Map entry points, routes, and architecture\n";
+    echo "                            Options: --mermaid   (render Mermaid.js flowchart TD)\n";
+    echo "                                     --json      (output JSON format)\n";
+    echo "  help, -h, --help          Show this detailed help screen\n\n";
+    echo "Examples:\n";
+    echo "  php bin/eidcloud-archaeologist excavate ./legacy_project/ --out=./docs/\n";
+    echo "  php bin/eidcloud-archaeologist dead-code ./legacy_project/\n";
+    echo "  php bin/eidcloud-archaeologist architecture-map ./legacy_project/ --mermaid\n\n";
+}
+
+$argv = $_SERVER['argv'] ?? [];
+$argc = count($argv);
+
+if ($argc < 2 || in_array('-h', $argv, true) || in_array('--help', $argv, true) || in_array('help', $argv, true)) {
+    printHelp();
+    exit(0);
+}
+
+$command = $argv[1];
+$targetDir = null;
+$outDir = './docs/';
+$asJson = in_array('--json', $argv, true);
+$asMermaid = in_array('--mermaid', $argv, true);
+
+// Parse arguments
+for ($i = 2; $i < $argc; $i++) {
+    $arg = $argv[$i];
+    if (str_starts_with($arg, '--out=')) {
+        $outDir = substr($arg, 6);
+    } elseif ($arg === '--json' || $arg === '--mermaid') {
+        continue;
+    } elseif ($targetDir === null && !str_starts_with($arg, '-')) {
+        $targetDir = $arg;
+    }
+}
+
+if ($targetDir === null) {
+    // If command itself was a directory, e.g. php bin/eidcloud-archaeologist ./legacy/
+    if (is_dir($command)) {
+        $targetDir = $command;
+        $command = 'excavate';
+    } else {
+        echo "❌ Error: Target project path required.\n";
+        printHelp();
+        exit(1);
+    }
+}
+
+if (!is_dir($targetDir)) {
+    echo "❌ Error: Directory not found: {$targetDir}\n";
+    exit(1);
+}
+
+$archaeologist = new Archaeologist();
+
+try {
+    switch ($command) {
+        case 'excavate':
+            if (!$asJson) {
+                printBanner();
+                echo "⏳ Excavating legacy codebase at: {$targetDir}\n";
+            }
+            $result = $archaeologist->excavate($targetDir);
+            $generated = $archaeologist->generateDocumentation($result, $outDir);
+
+            if ($asJson) {
+                echo json_encode($result->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                exit(0);
+            }
+
+            echo "✅ Codebase Excavation Complete in " . round($result->executionTime, 4) . "s!\n\n";
+            echo "📊 Excavation Summary:\n";
+            echo "   • Total Files Scanned : " . count($result->files) . "\n";
+            echo "   • Entry Points Found  : " . count($result->entryPoints) . "\n";
+            echo "   • Discovered Routes   : " . count($result->routes) . "\n";
+            echo "   • Database Tables     : " . count($result->database['tables'] ?? []) . "\n";
+            echo "   • Dead Classes        : " . count($result->deadCode['classes'] ?? []) . "\n";
+            echo "   • Dead Methods/Funcs  : " . (count($result->deadCode['methods'] ?? []) + count($result->deadCode['functions'] ?? [])) . "\n";
+            echo "   • Security Smells     : " . count($result->securitySmells) . "\n\n";
+            echo "📁 Generated Documentation in: {$outDir}\n";
+            foreach ($generated as $docName => $path) {
+                echo "   📄 {$docName} -> {$path}\n";
+            }
+            echo "\n";
+            break;
+
+        case 'dead-code':
+            if (!$asJson) {
+                printBanner();
+                echo "🔍 Scanning for dead code & abandoned symbols at: {$targetDir}\n";
+            }
+            $result = $archaeologist->excavate($targetDir);
+            $dead = $result->deadCode;
+
+            if ($asJson) {
+                echo json_encode($dead, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                exit(0);
+            }
+
+            echo "\n💀 Dead Code Findings:\n\n";
+            echo "1. Abandoned Classes (" . count($dead['classes'] ?? []) . "):\n";
+            if (empty($dead['classes'])) {
+                echo "   (None detected)\n";
+            } else {
+                foreach ($dead['classes'] as $cls) {
+                    echo "   - Class {$cls['fqcn']} [{$cls['file']}:{$cls['line']}]\n";
+                }
+            }
+
+            echo "\n2. Abandoned Functions (" . count($dead['functions'] ?? []) . "):\n";
+            if (empty($dead['functions'])) {
+                echo "   (None detected)\n";
+            } else {
+                foreach ($dead['functions'] as $fn) {
+                    echo "   - Function {$fn['fqfn']} [{$fn['file']}:{$fn['line']}]\n";
+                }
+            }
+
+            echo "\n3. Abandoned Methods (" . count($dead['methods'] ?? []) . "):\n";
+            if (empty($dead['methods'])) {
+                echo "   (None detected)\n";
+            } else {
+                foreach ($dead['methods'] as $m) {
+                    echo "   - Method {$m['class']}::{$m['method']} [{$m['file']}:{$m['line']}]\n";
+                }
+            }
+            echo "\n";
+            break;
+
+        case 'architecture-map':
+            if (!$asJson && !$asMermaid) {
+                printBanner();
+                echo "🗺️ Mapping architectural topology for: {$targetDir}\n";
+            }
+            $result = $archaeologist->excavate($targetDir);
+
+            if ($asMermaid) {
+                echo $archaeologist->generateMermaid($result) . "\n";
+                exit(0);
+            }
+
+            if ($asJson) {
+                echo json_encode([
+                    'entry_points' => $result->entryPoints,
+                    'routes' => $result->routes,
+                    'database' => $result->database,
+                    'dependencies' => $result->dependencies,
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                exit(0);
+            }
+
+            echo "\n🌐 Discovered Entry Points (" . count($result->entryPoints) . "):\n";
+            foreach ($result->entryPoints as $ep) {
+                echo "   - [{$ep['type']}] {$ep['file']}\n";
+            }
+
+            echo "\n🔀 Discovered Routes (" . count($result->routes) . "):\n";
+            foreach ($result->routes as $r) {
+                echo "   - {$r['method']} {$r['pattern']} ({$r['file']})\n";
+            }
+
+            echo "\n💾 Database Tables (" . count($result->database['tables'] ?? []) . "):\n";
+            foreach ($result->database['tables'] ?? [] as $tbl) {
+                echo "   - Table: {$tbl}\n";
+            }
+
+            echo "\n📦 Dependencies & Tools (" . count($result->dependencies) . "):\n";
+            foreach ($result->dependencies as $dep) {
+                echo "   - {$dep['package']} ({$dep['type']})\n";
+            }
+            echo "\n";
+            break;
+
+        default:
+            echo "❌ Unknown command: {$command}\n";
+            printHelp();
+            exit(1);
+    }
+} catch (\Throwable $e) {
+    echo "❌ Execution Error: " . $e->getMessage() . "\n";
+    echo $e->getTraceAsString() . "\n";
+    exit(1);
+}

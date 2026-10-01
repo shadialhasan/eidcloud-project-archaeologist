@@ -1,0 +1,32 @@
+{
+  "name": "eidcloud/project-archaeologist",
+  "description": "Legacy codebase excavation and architecture reverse-engineering engine detecting dead code and security smells in pure PHP",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Eng. MHD. Shadi AL-Hasan",
+      "email": "mhd.shadi.alhasan@gmail.com",
+      "role": "Lead Architect & Developer"
+    }
+  ],
+  "require": {
+    "php": ">=8.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "EidCloud\\ProjectArchaeologist\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "EidCloud\\ProjectArchaeologist\\Tests\\": "tests/"
+    }
+  },
+  "bin": [
+    "bin/eidcloud-archaeologist"
+  ],
+  "scripts": {
+    "test": "php tests/run_tests.php"
+  }
+}

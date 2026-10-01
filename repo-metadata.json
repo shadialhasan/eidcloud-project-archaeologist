@@ -1,0 +1,12 @@
+{
+  "description": "Legacy codebase excavation and architecture reverse-engineering engine detecting dead code and security smells in pure PHP",
+  "topics": [
+    "eidcloud",
+    "code-archaeology",
+    "legacy-code",
+    "architecture-reverse-engineering",
+    "dead-code-detector",
+    "code-intelligence",
+    "php8"
+  ]
+}
